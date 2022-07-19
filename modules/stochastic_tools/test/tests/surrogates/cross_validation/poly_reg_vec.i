@@ -62,7 +62,6 @@
     type = CrossValidationScores
     models = pr_surrogate
     execute_on = FINAL
-    responses = '0 1 2 3 4 5 6 7 8 9'
   []
 []
 
@@ -91,6 +90,8 @@
 []
 
 [Outputs]
-  csv = true
-  execute_on = FINAL
+  [out]
+    type = JSON
+    execute_on = FINAL
+  []
 []
