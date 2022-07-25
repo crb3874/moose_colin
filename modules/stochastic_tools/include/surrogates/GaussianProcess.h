@@ -38,6 +38,8 @@ public:
 private:
   StochasticTools::GaussianProcessHandler & _gp_handler;
 
+  Real evaluateHelper(const std::vector<Real> & x, Real & std, bool compute_variance) const;
+
   /// Paramaters (x) used for training
   const RealEigenMatrix & _training_params;
 };

@@ -44,15 +44,19 @@ GaussianProcess::setupCovariance(UserObjectName covar_name)
 Real
 GaussianProcess::evaluate(const std::vector<Real> & x) const
 {
-  // Overlaod for evaluate to maintain general compatibility. Only returns mean
-  Real dummy = 0;
-  return this->evaluate(x, dummy);
+  Real dummy = 0.0;
+  return evaluateHelper(x, dummy, false);
 }
 
 Real
 GaussianProcess::evaluate(const std::vector<Real> & x, Real & std_dev) const
 {
+  return evaluateHelper(x, std_dev, true);
+}
 
+Real
+GaussianProcess::evaluateHelper(const std::vector<Real> & x, Real & std_dev, bool compute_variance) const
+{
   unsigned int _n_params = _training_params.cols();
   unsigned int _num_tests = 1;
 
@@ -69,21 +73,27 @@ GaussianProcess::evaluate(const std::vector<Real> & x, Real & std_dev) const
   RealEigenMatrix K_train_test(_training_params.rows(), test_points.rows());
   _gp_handler.getCovarFunction().computeCovarianceMatrix(
       K_train_test, _training_params, test_points, false);
-  RealEigenMatrix K_test(test_points.rows(), test_points.rows());
-  _gp_handler.getCovarFunction().computeCovarianceMatrix(K_test, test_points, test_points, true);
 
   // Compute the predicted mean value (centered)
   RealEigenMatrix pred_value = (K_train_test.transpose() * _gp_handler.getKResultsSolve());
   // De-center/scale the value and store for return
   _gp_handler.getDataStandardizer().getDestandardized(pred_value);
 
-  RealEigenMatrix pred_var =
-      K_test - (K_train_test.transpose() * _gp_handler.getKCholeskyDecomp().solve(K_train_test));
+  // Variance is expensive. Only compute if needed.
+  if (compute_variance)
+  {
+    RealEigenMatrix K_test(test_points.rows(), test_points.rows());
+    _gp_handler.getCovarFunction().computeCovarianceMatrix(K_test, test_points, test_points, true);
+    RealEigenMatrix pred_var =
+        K_test - (K_train_test.transpose() * _gp_handler.getKCholeskyDecomp().solve(K_train_test));
 
-  // Vairance computed, take sqrt for standard deviation, scale up by training data std and store
-  RealEigenMatrix std_dev_mat = pred_var.array().sqrt();
-  _gp_handler.getDataStandardizer().getDescaled(std_dev_mat);
-  std_dev = std_dev_mat(0, 0);
+    // Vairance computed, take sqrt for standard deviation, scale up by training data std and store
+    RealEigenMatrix std_dev_mat = pred_var.array().sqrt();
+    _gp_handler.getDataStandardizer().getDescaled(std_dev_mat);
+    std_dev = std_dev_mat(0, 0);
+  }
+  else
+    std_dev = 0.0;
 
   return pred_value(0, 0);
 }
