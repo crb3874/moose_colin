@@ -20,7 +20,9 @@ LibtorchANNSurrogate::validParams()
 }
 
 LibtorchANNSurrogate::LibtorchANNSurrogate(const InputParameters & parameters)
-  : SurrogateModel(parameters)
+  : SurrogateModel(parameters),
+    _v_means(getModelData<std::vector<Real>>("means")),
+    _v_stddevs(getModelData<std::vector<Real>>("stddevs"))
 #ifdef LIBTORCH_ENABLED
     ,
     _nn(getModelData<std::shared_ptr<Moose::LibtorchArtificialNeuralNet>>("nn"))
@@ -46,8 +48,17 @@ LibtorchANNSurrogate::evaluate(const std::vector<Real> &
 
   torch::Tensor x_tf = torch::tensor(torch::ArrayRef<Real>(x.data(), x.size())).to(at::kDouble);
 
+  // Center-scale - if this is disabled, this call does not change x_tf
+  // Load into tensors. don't copy response moments.
+  torch::Tensor t_means = torch::tensor(torch::ArrayRef<Real>(_v_means.data(), _v_means.size() - 1)).to(at::kDouble);
+  torch::Tensor t_stddevs = torch::tensor(torch::ArrayRef<Real>(_v_stddevs.data(), _v_stddevs.size() - 1)).to(at::kDouble);
+  x_tf = x_tf.sub(t_means).div(t_stddevs);
+
   // Compute prediction
   val = _nn->forward(x_tf).item<double>();
+
+  // Undo center-scaling.
+  val = _v_stddevs.back() * val + _v_means.back();
 #endif
 
   return val;

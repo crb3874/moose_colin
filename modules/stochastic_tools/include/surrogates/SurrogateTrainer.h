@@ -246,6 +246,8 @@ private:
   const unsigned int & _cv_n_trials;
   /// Seed used for _cv_generator.
   const unsigned int & _cv_seed;
+  /// Flag - compute relative or absolute RMSE
+  const MooseEnum & _cv_rmse_type;
   /// Random number generator used for shuffling sampler rows during splitting.
   MooseRandom _cv_generator;
   /// SurrogateModel used to evaluate model error relative to test points.

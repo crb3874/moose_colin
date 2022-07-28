@@ -79,6 +79,16 @@ private:
   /// Print the training loss value every given epoch
   const unsigned int _print_epoch_loss;
 
+  /// Switch for training param (x) standardization
+  bool _standardize_params;
+
+  /// Switch for training data(y) standardization
+  bool _standardize_data;
+
+  std::vector<Real> & _means;
+
+  std::vector<Real> & _stddevs;
+
 #ifdef LIBTORCH_ENABLED
   /// Pointer to the neural net object (initialized as null)
   std::shared_ptr<Moose::LibtorchArtificialNeuralNet> & _nn;

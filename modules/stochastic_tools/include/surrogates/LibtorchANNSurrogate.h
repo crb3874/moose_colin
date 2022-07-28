@@ -26,6 +26,10 @@ public:
   virtual Real evaluate(const std::vector<Real> & x) const override;
 
 protected:
+
+  const std::vector<Real> & _v_means;
+  const std::vector<Real> & _v_stddevs;
+  
 #ifdef LIBTORCH_ENABLED
   /// Pointer to the neural net object (initialized as null)
   const std::shared_ptr<Moose::LibtorchArtificialNeuralNet> & _nn;

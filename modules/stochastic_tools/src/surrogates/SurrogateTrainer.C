@@ -78,6 +78,8 @@ SurrogateTrainer::validParams()
                                 std::numeric_limits<unsigned int>::max(),
                                 "Seed used to initialize random number generator for data "
                                 "splitting during cross validation.");
+  MooseEnum cv_rmse_type("absolute=0 relative=1", "absolute");
+  params.addParam<MooseEnum>("cv_rmse_type", cv_rmse_type, "Type of rmse to compute (absolute or relative).");
 
   return params;
 }
@@ -97,6 +99,7 @@ SurrogateTrainer::SurrogateTrainer(const InputParameters & parameters)
     _n_splits(getParam<unsigned int>("cv_splits")),
     _cv_n_trials(getParam<unsigned int>("cv_n_trials")),
     _cv_seed(getParam<unsigned int>("cv_seed")),
+    _cv_rmse_type(getParam<MooseEnum>("cv_rmse_type")),
     _doing_cv(_cv_type != "none"),
     _cv_trial_scores(declareModelData<std::vector<std::vector<Real>>>("cv_scores"))
 {
@@ -350,7 +353,10 @@ SurrogateTrainer::evaluateModelError(const SurrogateModel & surr)
   if (_rval)
   {
     Real model_eval = surr.evaluate(_predictor_data);
-    error[0] = MathUtils::pow(model_eval - (*_rval), 2);
+    if (_cv_rmse_type == "absolute")
+      error[0] = MathUtils::pow(model_eval - (*_rval), 2);
+    else if (_cv_rmse_type == "relative")
+      error[0] = MathUtils::pow( (model_eval - (*_rval))/(*_rval) , 2);
   }
   else if (_rvecval)
   {

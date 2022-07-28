@@ -221,7 +221,7 @@ protected:
 
   /// Cholesky decomposition Eigen object
   Eigen::LLT<RealEigenMatrix> _K_cho_decomp;
-
+  
   /// Paramaters (x) used for training, along with statistics
   const RealEigenMatrix * _training_params;
 

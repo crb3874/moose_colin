@@ -50,6 +50,10 @@ LibtorchANNTrainer::validParams()
   params.addParam<unsigned int>(
       "seed", 11, "Random number generator seed for stochastic optimizers.");
 
+  params.addParam<bool>(
+      "standardize_params", false, "Standardize (center and scale) training parameters (x values)");
+  params.addParam<bool>(
+      "standardize_data", false, "Standardize (center and scale) training data (y values)");
   params.suppressParameter<MooseEnum>("response_type");
   return params;
 }
@@ -69,7 +73,11 @@ LibtorchANNTrainer::LibtorchANNTrainer(const InputParameters & parameters)
     _filename(getParam<std::string>("filename")),
     _read_from_file(getParam<bool>("read_from_file")),
     _learning_rate(getParam<Real>("learning_rate")),
-    _print_epoch_loss(getParam<unsigned int>("print_epoch_loss"))
+    _print_epoch_loss(getParam<unsigned int>("print_epoch_loss")),
+    _standardize_params(getParam<bool>("standardize_params")),
+    _standardize_data(getParam<bool>("standardize_data")),
+    _means(declareModelData<std::vector<Real>>("means")),
+    _stddevs(declareModelData<std::vector<Real>>("stddevs"))
 #ifdef LIBTORCH_ENABLED
     ,
     _nn(declareModelData<std::shared_ptr<Moose::LibtorchArtificialNeuralNet>>("nn"))
@@ -93,6 +101,10 @@ LibtorchANNTrainer::preTrain()
   _flattened_response.clear();
   _flattened_data.reserve(getLocalSampleSize() * _n_dims);
   _flattened_response.reserve(getLocalSampleSize());
+
+  // Set means/stddevs to (0.0, 1.0)
+  _means.assign(_predictor_row.size() + 1, 0.0);
+  _stddevs.assign(_predictor_row.size() + 1, 1.0);
 }
 
 void
@@ -123,6 +135,31 @@ LibtorchANNTrainer::postTrain()
       torch::from_blob(_flattened_data.data(), {num_samples, num_inputs}, options).to(at::kDouble);
   torch::Tensor response_tensor =
       torch::from_blob(_flattened_response.data(), {num_samples}, options).to(at::kDouble);
+
+  // Center-scale if requested.
+  if (_standardize_params)
+  {
+    torch::Tensor means = data_tensor.mean(0);
+    torch::Tensor stddevs = data_tensor.std(0);
+
+    data_tensor = data_tensor.sub(means).div(stddevs);
+
+    for (auto i : make_range(_n_dims))
+    {
+      _means[i] = means[i].item<Real>();
+      _stddevs[i] = stddevs[i].item<Real>();
+    }
+  }
+  if (_standardize_data)
+  {
+    torch::Tensor mean = response_tensor.mean(0);
+    torch::Tensor stddev = response_tensor.std(0);
+
+    response_tensor = response_tensor.sub(mean).div(stddev);
+
+    _means.back() = mean.item<Real>();
+    _stddevs.back() = stddev.item<Real>();
+  }
 
   // We create a custom data loader which can be used to select samples for the in
   // the training process. See the header file for the definition of this structure.

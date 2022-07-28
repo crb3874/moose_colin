@@ -18,6 +18,8 @@
 
 #include <math.h>
 
+#include <chrono>
+
 namespace StochasticTools
 {
 GaussianProcessHandler::GaussianProcessHandler() : _tao_comm(MPI_COMM_SELF) {}
@@ -226,6 +228,7 @@ GaussianProcessHandler::formFunctionGradient(Tao /*tao*/,
   // testing auto tuning
   RealEigenMatrix dKdhp(_training_params->rows(), _training_params->rows());
   RealEigenMatrix alpha = _K_results_solve * _K_results_solve.transpose();
+
   for (auto iter = _tuning_data.begin(); iter != _tuning_data.end(); ++iter)
   {
     std::string hyper_param_name = iter->first;
@@ -236,10 +239,11 @@ GaussianProcessHandler::formFunctionGradient(Tao /*tao*/,
       grad.set(std::get<0>(iter->second) + ii, -tmp.trace() / 2.0);
     }
   }
-  //
+
   Real log_likelihood = 0;
   log_likelihood += -(_training_data->transpose() * _K_results_solve)(0, 0);
-  log_likelihood += -std::log(_K.determinant());
+  Real log_determinant = _K_cho_decomp.matrixLLT().diagonal().array().log().sum();
+  log_likelihood -= 2 * log_determinant;
   log_likelihood += -_training_data->rows() * std::log(2 * M_PI);
   log_likelihood = -log_likelihood / 2;
   *f = log_likelihood;
